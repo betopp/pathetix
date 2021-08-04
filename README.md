@@ -7,4 +7,6 @@ It boots and runs the Open Korn Shell on an AMD64 PC. The kernel is fully reentr
 
 The root filesystem is in RAM only. A multiboot bootloader should load a TAR file as a module for the kernel to find. The kernel unpacks the TAR into the RAM FS before trying to exec init.
 
+All code is original and available under the MIT license, except the Korn Shell port.
+
 
