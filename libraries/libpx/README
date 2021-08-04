@@ -1,0 +1,6 @@
+libpx is the kernel-call library for Pathetix. It represents exactly the system-calls that the kernel will handle.
+
+Each architecture needs to define how a system-call is made, and provide entry points for all calls in user mode.
+
+pxcall.h serves as our system-call table, invoked with the macro-trick.
+

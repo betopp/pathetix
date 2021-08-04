@@ -1,0 +1,5 @@
+This directory contains the Makefile included as PROGRAM_PLATFORM when building programs for AMD64.
+
+This Makefile causes the programs to be output in obj/ and bin/ directories in this folder.
+
+

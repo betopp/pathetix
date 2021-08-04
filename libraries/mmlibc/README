@@ -1,0 +1,4 @@
+mmlibc is the libc used in Pathetix.
+
+mm doesn't mean anything at this point. Two prior projects began with "m" and had "mlibc" and "mmlibc" as their C libraries.
+

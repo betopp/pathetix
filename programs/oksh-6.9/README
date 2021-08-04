@@ -1,0 +1,6 @@
+This is a port of the Portable OpenBSD Korn Shell, from github.com/ibara/oksh . 
+
+Minimal changes have been made to get it compiling for Pathetix, but it is mostly untouched.
+
+This code was used as a yardstick for initially implementing the libc and kernel.
+

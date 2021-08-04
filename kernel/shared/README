@@ -1,0 +1,7 @@
+This is the bulk of the kernel code.
+
+src/ contains the kernel source.
+hal/ contains headers declaring architecture-specific functions.
+
+The kernel is actually built from an architecture-specific build directory, which symlinks shared/src and implements the entry-points and the functions in shared/hal.
+
