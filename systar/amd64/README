@@ -1,0 +1,2 @@
+This script builds the system TAR file for AMD64. There should be a "dev" directory here containing one character special called "con" at major/minor 1/1. 
+
