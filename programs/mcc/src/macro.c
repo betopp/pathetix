@@ -32,9 +32,6 @@ void macro_define(const char *name, tok_t *aftername)
 	{
 		tok_err(aftername->prev, "cannot define \"defined\"");
 	}
-	
-	//Undefine the macro if it was already defined as something else
-	macro_undef(name);
 
 	//Make room for the macro definition and store the name
 	macro_t *mptr = alloc_mandatory(sizeof(macro_t)); 
@@ -128,6 +125,15 @@ void macro_define(const char *name, tok_t *aftername)
 		}
 		
 		mptr->toks = tok_copy(body, copyend->prev);
+	}
+	
+	//Check if our list of defined macros already includes this.
+	for(macro_t *mm = macro_list; mm != NULL; mm = mm->next)
+	{
+		if(!strcmp(mm->name, name))
+		{
+			tok_err(aftername->prev, "redefinition of macro");
+		}
 	}
 	
 	//Put the macro in our list of defined macros.
@@ -328,7 +334,8 @@ tok_t *macro_process(tok_t *line)
 			}
 			
 			//Need to see the right number of parameters
-			tok_t **parmvals = alloc_mandatory(sizeof(tok_t*) * (found->nparams + 1));
+			tok_t **parmvals_start = alloc_mandatory(sizeof(tok_t*) * (found->nparams + 1));
+			tok_t **parmvals_end = alloc_mandatory(sizeof(tok_t*) * (found->nparams + 1));
 			size_t parmnext = 0;
 			
 			//Parameters start after left-paren
@@ -341,22 +348,47 @@ tok_t *macro_process(tok_t *line)
 				{
 					if(src_end->type != TOK_PARENR)
 					{
-						tok_err(src_end, "expected ) after parameter");
+						tok_err(src_end, "expected ) at end of parameter list");
 					}
 					
 					break;
 				}
 				
-				//Otherwise, we should see an identifier for the parameter.
-				if(src_end->type != TOK_IDENT && src_end->type != TOK_PNUMBER && src_end->type != TOK_STRLIT)
+				//Otherwise, the next parameter starts here.
+				//It shouldn't be a newline or end-of-file.
+				if(src_end->type == TOK_NEWLINE || src_end->type == TOK_EOF)
 				{
-					tok_err(src_end, "expected macro parameter");
+					tok_err(src_end, "expected macro parameters");
+				}
+				parmvals_start[parmnext] = src_end;
+	
+				//Parameter continues until a comma or the matching right-paren.
+				//Parameter continues across nested parens.
+				//(The parameter may be empty if it begins with a comma or right-paren.)
+				int paren_nest = 0;
+				while(paren_nest || (src_end->type != TOK_COMMA && src_end->type != TOK_PARENR))
+				{
+					if(src_end == NULL || src_end->type == TOK_NEWLINE || src_end->type == TOK_EOF)
+					{
+						tok_err(parmvals_start[parmnext], "expected macro parameters");
+					}
+					
+					if(src_end->type == TOK_PARENL)
+						paren_nest++;
+					
+					if(src_end->type == TOK_PARENR)
+						paren_nest--;
+					
+					if(paren_nest < 0)
+						tok_err(src_end, "mismatched parens in macro usage");
+					
+					src_end = src_end->next;
 				}
 				
-				parmvals[parmnext] = src_end;
-				parmnext++;
-				src_end = src_end->next;
+				parmvals_end[parmnext] = src_end;
 				
+				parmnext++;
+								
 				//Nonfinal parameter should be followed by comma
 				if(parmnext < found->nparams)
 				{
@@ -395,26 +427,33 @@ tok_t *macro_process(tok_t *line)
 				else
 				{
 					//This token from the macro definition is replaced by a parameter.
-					//Replace with the parameter's value.
-					copied = tok_copy(parmvals[subidx], parmvals[subidx]);
+					//Replace with the parameter's value - from the beginning to just before the comma/paren.
+					if(parmvals_end[subidx] != parmvals_start[subidx])
+					{
+						copied = tok_copy(parmvals_start[subidx], parmvals_end[subidx]->prev);
+					}
 				}
 				
-				//Append to the replacement sequence
-				if(repl_start == NULL)
+				//Append to the replacement sequence (or not, for an empty parameter)
+				if(copied != NULL)
 				{
-					repl_start = copied;
-					repl_end = copied;
-				}
-				else
-				{
-					repl_end->next = copied;
-					copied->prev = repl_end;
-					
-					repl_end = copied;
+					if(repl_start == NULL)
+					{
+						repl_start = copied;
+						repl_end = copied;
+					}
+					else
+					{
+						repl_end->next = copied;
+						copied->prev = repl_end;
+						
+						repl_end = copied;
+					}
 				}
 			}
 			
-			free(parmvals);
+			free(parmvals_start);
+			free(parmvals_end);
 		}
 		
 		//Put replacement into the source list, in place of the replaced macro.
@@ -461,13 +500,19 @@ tok_t *macro_process(tok_t *line)
 		}
 		
 		//Delete the replaced macro
+		tok_t *after_src = src_end->next;
 		src_start->prev = NULL;
 		src_end->next = NULL;
 		tok_delete_range(src_start, src_end);
 		
-		//Start the line over (and note that we might have replaced the first token in the line)
+		//Start the line over (and note that we might have replaced or eliminated the first token in the line)
 		if(line == src_start)
-			line = repl_start;
+		{
+			if(repl_start != NULL)
+				line = repl_start;
+			else
+				line = after_src;
+		}
 		
 		line_pos = line;
 		continue;

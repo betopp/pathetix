@@ -61,6 +61,8 @@ int main(int argc, const char **argv)
 	{
 		//printf("%s\n\t%s\n", tok_typename(tt), (tt->text != NULL) ? tt->text : "");
 		printf("%s ", tt->text);
+		if(tt->text[0] == ';')
+			printf("\n");
 	}
 	
 	return 0;

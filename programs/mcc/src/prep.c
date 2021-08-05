@@ -14,17 +14,47 @@
 #include <assert.h>
 #include <stdlib.h>
 
+//Depth of nested "if" blocks
+int prep_if_depth;
 
-//Depth of "if" conditions, whether successful or failed
-static int prep_if_level;
+//Results of "if" calls
+#define PREP_IF_MAX 128
+#define PREP_IF_STATE_PASS (1) //Successful condition
+#define PREP_IF_STATE_FAIL (2) //Failed condition
+#define PREP_IF_STATE_ELSE (3) //Failed because we already passed the successful block and had an else/elif
+int prep_if_state[PREP_IF_MAX];
 
-//Last "if" condition that was successful.
-static int prep_if_match;
+//Whether conditionals are currently satisfied.
+bool prep_if_pass = true;
+
+//Recomputes prep_if_pass
+void prep_if_pass_compute(void)
+{
+	prep_if_pass = true;
+	for(int dd = 0; dd < prep_if_depth; dd++)
+	{
+		switch(prep_if_state[dd])
+		{
+			case PREP_IF_STATE_PASS:
+				break;
+			
+			case PREP_IF_STATE_FAIL:
+				prep_if_pass = false;
+				return;
+			
+			case PREP_IF_STATE_ELSE:
+				prep_if_pass = false;
+				return;
+		
+			default: abort();
+		}
+	}
+}
 
 //Handles preprocessor directive - define
 static void prep_d_define(tok_t *afterkey, tok_t *end)
-{
-	if(prep_if_match < prep_if_level)
+{	
+	if(!prep_if_pass)
 		return;
 	
 	//Define should be followed by an identifier for the name of the macro
@@ -39,7 +69,7 @@ static void prep_d_define(tok_t *afterkey, tok_t *end)
 //Handles preprocessor directive - undef
 static void prep_d_undef(tok_t *afterkey, tok_t *end)
 {	
-	if(prep_if_match < prep_if_level)
+	if(!prep_if_pass)
 		return;
 	
 	//Undef should be followed by an identifier for the name of the macro
@@ -60,11 +90,10 @@ static void prep_d_undef(tok_t *afterkey, tok_t *end)
 //Handles preprocessor directive - if
 static void prep_d_if(tok_t *afterkey, tok_t *end)
 {
-	if(prep_if_match < prep_if_level)
+	//Limit nesting depth
+	if(prep_if_depth >= PREP_IF_MAX)
 	{
-		//Higher-level condition has already failed.
-		prep_if_level++;
-		return;
+		tok_err(afterkey->prev, "nested too deeply");
 	}
 	
 	//Should have at least one token here
@@ -116,11 +145,9 @@ static void prep_d_if(tok_t *afterkey, tok_t *end)
 	}
 	
 	//Condition based on whether the expression is nonzero
-	prep_if_level++;
-	if(tinfo_val_nz(predicate->tinfo, predicate->value))
-	{
-		prep_if_match++;
-	}
+	prep_if_state[prep_if_depth] = tinfo_val_nz(predicate->tinfo, predicate->value) ? PREP_IF_STATE_PASS : PREP_IF_STATE_FAIL;
+	prep_if_depth++;
+	prep_if_pass_compute();
 	
 	syntax_free(predicate);
 	tok_delete_all(if_toks_start);
@@ -129,6 +156,12 @@ static void prep_d_if(tok_t *afterkey, tok_t *end)
 //Handles preprocessor directive - ifdef
 static void prep_d_ifdef(tok_t *afterkey, tok_t *end)
 {
+	//Limit nesting depth
+	if(prep_if_depth >= PREP_IF_MAX)
+	{
+		tok_err(afterkey->prev, "nested too deeply");
+	}
+	
 	if(afterkey->type != TOK_IDENT)
 	{
 		tok_err(afterkey, "expected identifier");
@@ -136,14 +169,20 @@ static void prep_d_ifdef(tok_t *afterkey, tok_t *end)
 	
 	bool isdef = macro_isdef(afterkey->text);
 	
-	prep_if_level++;
-	if(isdef)
-		prep_if_match++;
+	prep_if_state[prep_if_depth] = isdef ? PREP_IF_STATE_PASS : PREP_IF_STATE_FAIL;
+	prep_if_depth++;
+	prep_if_pass_compute();
 }
 
 //Handles preprocessor directive - ifndef
 static void prep_d_ifndef(tok_t *afterkey, tok_t *end)
 {
+	//Limit nesting depth
+	if(prep_if_depth >= PREP_IF_MAX)
+	{
+		tok_err(afterkey->prev, "nested too deeply");
+	}
+	
 	if(afterkey->type != TOK_IDENT)
 	{
 		tok_err(afterkey, "expected identifier");
@@ -151,53 +190,97 @@ static void prep_d_ifndef(tok_t *afterkey, tok_t *end)
 	
 	bool isdef = macro_isdef(afterkey->text);
 	
-	prep_if_level++;
-	if(!isdef)
-		prep_if_match++;
+	prep_if_state[prep_if_depth] = (!isdef) ? PREP_IF_STATE_PASS : PREP_IF_STATE_FAIL;
+	prep_if_depth++;
+	prep_if_pass_compute();
 }
 
 //Handles preprocessor directive - else
 static void prep_d_else(tok_t *afterkey, tok_t *end)
 {
-	if(prep_if_match == prep_if_level - 1)
+	if(prep_if_depth == 0)
+		tok_err(afterkey->prev, "expected if before else");
+	
+	//An "else" doesn't change the level of nesting, but alters whether we passed/failed
+	int last = prep_if_depth-1;
+	switch(prep_if_state[last])
 	{
-		//Very last condition was the only one that didn't match.
-		//We're now in the "else" side, so it does.
-		prep_if_match = prep_if_level;
+		case PREP_IF_STATE_PASS:
+			//Passed before. Now we're in the failing side.
+			prep_if_state[last] = PREP_IF_STATE_ELSE;
+			break;
+		case PREP_IF_STATE_FAIL:
+			//Failed before. Now we're in the passing side.
+			prep_if_state[last] = PREP_IF_STATE_PASS;
+			break;
+		case PREP_IF_STATE_ELSE:
+			//Further failure case of an elif sequence where some other case succeeded.
+			//We're still not in the passing side.
+			prep_if_state[last] = PREP_IF_STATE_ELSE;
+			break;
+		default: abort();
 	}
-	else if(prep_if_match == prep_if_level)
-	{
-		//All conditions were satisfied, and now the most recent one isn't.
-		prep_if_match = prep_if_level - 1;
-	}
-	else
-	{
-		//A higher condition didn't match, so the "else" doesn't matter.
-	}
+	
+	prep_if_pass_compute();
 }
 
 //Handles preprocessor directive - elif
 static void prep_d_elif(tok_t *afterkey, tok_t *end)
-{
-	prep_d_else(afterkey, end);
+{	
+	if(prep_if_depth == 0)
+		tok_err(afterkey->prev, "expected if before elif");
+	
+	//Evaluate the "if" statement just encountered
 	prep_d_if(afterkey, end);
+	
+	//Pop its result off the stack
+	int new_result = prep_if_state[prep_if_depth-1];
+	prep_if_state[prep_if_depth-1] = 0;
+	prep_if_depth--;
+	
+	//Combine with the existing "elif" sequence
+	int last = prep_if_depth-1;
+	switch(prep_if_state[last])
+	{
+		case PREP_IF_STATE_PASS:
+			//We were previously in a passing block of the elif sequence.
+			//So we never enter this one, or any further elifs, regardless of the "if" result.
+			prep_if_state[last] = PREP_IF_STATE_ELSE;
+			break;
+		case PREP_IF_STATE_FAIL:
+			//We were previously in a failed block of the elif sequence.
+			//If this condition succeeded, we enter it. Otherwise, continue being in a failed state.
+			if(new_result == PREP_IF_STATE_PASS)
+				prep_if_state[last] = PREP_IF_STATE_PASS;
+			
+			break;
+		case PREP_IF_STATE_ELSE:
+			//We had already satisfied, and moved past, some other block of the elif sequence.
+			//We never go back. Stay in "other block satisfied" state.
+			prep_if_state[last] = PREP_IF_STATE_ELSE;
+			break;
+		default: abort();
+	}
+	
+	prep_if_pass_compute();
 }
 
 //Handles preprocessor directive - endif
 static void prep_d_endif(tok_t *afterkey, tok_t *end)
 {
-	if(prep_if_match == prep_if_level)
-		prep_if_match--;
-
-	prep_if_level--;
+	if(prep_if_depth == 0)
+		tok_err(afterkey->prev, "expected if before endif");
 	
-	assert(prep_if_match <= prep_if_level);
+	prep_if_state[prep_if_depth-1] = 0;
+	prep_if_depth--;
+	
+	prep_if_pass_compute();
 }
 
 //Handles preprocessor directive - error
 static void prep_d_error(tok_t *afterkey, tok_t *end)
 {
-	if(prep_if_match < prep_if_level)
+	if(!prep_if_pass)
 		return;
 	
 	tok_err(afterkey, "#error");
@@ -206,7 +289,7 @@ static void prep_d_error(tok_t *afterkey, tok_t *end)
 //Handles preprocessor directive - include
 static void prep_d_include(tok_t *afterkey, tok_t *end)
 {
-	if(prep_if_match < prep_if_level)
+	if(!prep_if_pass)
 		return;
 	
 	//Include directive should only have a single token after the keyword - a string
@@ -219,6 +302,8 @@ static void prep_d_include(tok_t *afterkey, tok_t *end)
 	{
 		tok_err(afterkey->next, "expected end-of-line");
 	}
+	
+	printf("processing include %s\n", afterkey->text);
 	
 	//Erase the ending quote from the string and try to open the file skipping the opening quote
 	afterkey->text[strlen(afterkey->text)-1] = '\0';
@@ -313,67 +398,73 @@ void prep_pass(tok_t *tok)
 	tok_t *tt_start = tok;
 	while(tt_start != NULL)
 	{
-		//Preprocessor directives must start at start-of-file or newline, and be followed by an octothorpe (#).
-		bool at_newline = (tt_start->type == TOK_FILE) || (tt_start->type == TOK_NEWLINE);
-		bool hash_next = (tt_start->next != NULL) && (tt_start->next->type == TOK_HASH);
-		if(!(at_newline && hash_next))
+		//Advance past newlines/etc
+		if(tt_start->type == TOK_FILE || tt_start->type == TOK_NEWLINE || tt_start->type == TOK_EOF)
+		{
+			tt_start = tt_start->next;
+			continue;
+		}
+		
+		//See if the line begins with an octothorpe, and is thus a preprocessor directive.
+		if(tt_start->type == TOK_HASH)
+		{
+			//The preprocessor directive continues until the following newline.
+			tt_start = tt_start->prev;
+			tok_t *tt_end = tt_start->next;
+			while(tt_end->type != TOK_NEWLINE && tt_end->type != EOF)
+			{
+				tt_end = tt_end->next;
+			}
+			
+			//tt_start now refers to a newline (or start-of-file) that begins the directive.
+			//tt_end refers to the newline (or end-of-file) that ends the directive.
+			
+			//Process the stuff inbetween as a directive.
+			prep_line(tt_start->next, tt_end->prev);
+			
+			//The directive will be deleted, leaving tt_start and tt_end (the newlines) untouched.
+			//Optionally, new tokens will be inserted in its place.
+			//Continue preprocessing from the same newline that once started the directive.
+			continue;
+		}
+		else
 		{
 			//Not a preprocessor directive.
-			if(prep_if_match < prep_if_level)
+			if(!prep_if_pass)
 			{
-				//If we're failing a preprocessor conditional (ifdef etc) then delete the token.
-				tok_t *next = tt_start->next;
-				tok_delete_single(tt_start);
-				tt_start = next;
+				//If we're failing a preprocessor conditional (ifdef etc) then delete the line.
+				
+				//tt_start points to the contents after the newline - find where the next newline is
+				tok_t *delete_start = tt_start;
+				tok_t *delete_end = tt_start;
+				while(delete_end->type != TOK_FILE && delete_end->type != TOK_NEWLINE && delete_end->type != TOK_EOF)
+				{
+					delete_end = delete_end->next;
+				}
+				
+				//Back up to the token before this line, and delete the line and try again.
+				tt_start = tt_start->prev;
+				tok_delete_range(delete_start, delete_end);
 				continue;
 			}
 			else
 			{
-				tt_start = tt_start->next;
+				//Run the line through macro replacement.
+				tt_start = macro_process(tt_start);
+				
+				//Advance to the end-of-line of the line we just processed.
+				while(tt_start->type != TOK_FILE && tt_start->type != TOK_NEWLINE && tt_start->type != TOK_EOF)
+				{
+					tt_start = tt_start->next;
+				}
+				
 				continue;
 			}
 		}
-		
-		//Alright, found a line beginning with an octothorpe.
-		
-		//The preprocessor directive continues until the following newline.
-		tok_t *tt_end = tt_start->next;
-		while(tt_end->type != TOK_NEWLINE && tt_end->type != EOF)
-		{
-			tt_end = tt_end->next;
-		}
-		
-		//tt_start now refers to a newline (or start-of-file) that begins the directive.
-		//tt_end refers to the newline (or end-of-file) that ends the directive.
-		
-		//Process the stuff inbetween as a directive.
-		prep_line(tt_start->next, tt_end->prev);
-		
-		//The directive will be deleted, leaving tt_start and tt_end (the newlines) untouched.
-		//Optionally, new tokens will be inserted in its place.
-		//Continue preprocessing from the same newline that once started the directive.
-		continue;
 	}
 	
-	//Run through the file and evaluate macros
-	tt_start = tok;
-	while(tt_start != NULL)
-	{
-		//Process line we're looking at
-		tt_start = macro_process(tt_start);
-		
-		//Advance until a newline or EOF
-		while(tt_start != NULL && tt_start->type != TOK_NEWLINE && tt_start->type != TOK_EOF)
-		{
-			tt_start = tt_start->next;
-		}
-		
-		//Advance past newline/EOF
-		while(tt_start != NULL && (tt_start->type == TOK_NEWLINE || tt_start->type == TOK_EOF))
-		{
-			tt_start = tt_start->next;
-		}
-	}
+	//Clean up tokens and turn preprocessor tokens into processing tokens
+	prep_repl(tok);
 }
 
 void prep_repl(tok_t *tok)

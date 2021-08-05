@@ -702,7 +702,7 @@ void tok_pass_nowh(tok_t *list)
 	{
 		tok_t *ttn = tt->next;
 		
-		if(tt->type == TOK_FILE || tt->type == TOK_EOF || tt->type == TOK_NEWLINE)
+		if(tt->type == TOK_EOF || tt->type == TOK_NEWLINE)
 		{
 			tok_delete_single(tt);
 		}
