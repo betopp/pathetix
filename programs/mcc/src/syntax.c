@@ -614,6 +614,19 @@ void syntax_doconst(syntax_node_t *node)
 		return;
 	}
 	
+	//Handle parenthesized expressions
+	if(node->type == S_PRIMARY_EXPRESSION)
+	{
+		//Child 0 and 2 are parens, 1 is a single expression
+		assert(node->children[0]->type == (int)TOK_PARENL);
+		assert(node->children[2]->type == (int)TOK_PARENR);
+		syntax_doconst(node->children[1]);
+		
+		node->tinfo = node->children[1]->tinfo;
+		node->value = node->children[1]->value;
+		return;
+	}
+	
 	//Handle logical operators
 	if(node->type == S_LOGICAL_AND_EXPRESSION || node->type == S_LOGICAL_OR_EXPRESSION)
 	{
@@ -628,8 +641,22 @@ void syntax_doconst(syntax_node_t *node)
 		{
 			bool a_nz = tinfo_val_nz(node->children[0]->tinfo, node->children[0]->value);
 			bool b_nz = tinfo_val_nz(node->children[2]->tinfo, node->children[2]->value);
+			
+			bool succeeds = false;
+			switch((tok_type_t)(node->children[1]->type))
+			{
+				case TOK_DAMP:
+					succeeds = a_nz && b_nz;
+					break;
+				case TOK_DBAR:
+					succeeds = a_nz || b_nz;
+					break;
+				default:
+					abort();
+			}
+			
 			node->value = alloc_mandatory(sizeof(int));
-			*(int*)(node->value) = a_nz && b_nz;
+			*(int*)(node->value) = succeeds ? 1 : 0;
 		}
 		
 		return;
@@ -714,8 +741,52 @@ void syntax_doconst(syntax_node_t *node)
 		
 		return;
 	}
-		
 	
+	//Handle relations
+	if(node->type == S_RELATIONAL_EXPRESSION)
+	{
+		//Child 0 and 2 are operands. Child 1 specifies type of operation.
+		syntax_doconst(node->children[0]);
+		syntax_doconst(node->children[2]);
+		
+		//Result of relation always has type int, and is constant if both subexpressions are
+		node->tinfo = tinfo_for_basic(BTYPE_INT);
+		if(node->children[0]->value != NULL && node->children[2]->value != NULL)
+		{
+			//Todo - this approach might not be correct for some bizarre floating-point relations.
+			bool lt = tinfo_val_lt(
+				node->children[0]->tinfo, node->children[0]->value,
+				node->children[2]->tinfo, node->children[2]->value);
+			bool eq = tinfo_val_eq(
+				node->children[0]->tinfo, node->children[0]->value,
+				node->children[2]->tinfo, node->children[2]->value);
+		
+			bool succeeds = false;
+			switch((tok_type_t)(node->children[1]->type))
+			{
+				case TOK_LT:
+					succeeds = lt;
+					break;
+				case TOK_GT:
+					succeeds = !(lt || eq);
+					break;
+				case TOK_LEQ:
+					succeeds = lt || eq;
+					break;
+				case TOK_GEQ:
+					succeeds = !lt;
+					break;
+				default:
+					abort();
+			}
+			
+			node->value = alloc_mandatory(sizeof(int));
+			*(int*)(node->value) = succeeds ? 1 : 0;
+		}
+		
+		return;
+	}
+		
 	//Todo - handle other expressions
 	abort();
 	return;

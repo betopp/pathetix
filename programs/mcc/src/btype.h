@@ -48,6 +48,18 @@ bool btype_is_floating(btype_t btype);
 //Returns BTYPE_NONE if incompatible.
 btype_t btype_for_arithmetic(btype_t a, btype_t b);
 
+//Given two values in the same basic type, returns whether they are equal.
+bool btype_eq(btype_t btype, const void *value_a, const void *value_b);
+
+//Given two values in the same basic type, returns whether the first is less than the second.
+bool btype_lt(btype_t btype, const void *value_a, const void *value_b);
+
+//Given a value in a basic type, returns whether it compares not equal to zero.
+bool btype_nz(btype_t btype, const void *value);
+
+//Converts a value from one basic type to another. Returns newly allocated memory containing the new value.
+void *btype_conv(const void *value, btype_t from, btype_t to);
+
 #endif //BTYPE_H
 
 

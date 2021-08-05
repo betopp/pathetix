@@ -3,6 +3,9 @@
 //Bryan E. Topp <betopp@betopp.com> 2021
 
 #include "btype.h"
+#include "alloc.h"
+
+#include <stdlib.h>
 
 //Basic categorization of types
 typedef enum btype_class_e
@@ -126,4 +129,94 @@ btype_t btype_for_arithmetic(btype_t a, btype_t b)
 		return BTYPE_UINT;
 	
 	return BTYPE_INT;
+}
+
+bool btype_nz(btype_t btype, const void *value)
+{
+	switch(btype)
+	{
+		//Use macro-trick to cast to the appropriate type and compare.
+		#define BTYPE_MAC(etype, ctype) case etype: return ((*(const ctype*)value) != 0);
+		#include "btype_mac.def"
+		#undef BTYPE_MAC
+		default: abort(); //todo
+	}
+}
+
+bool btype_eq(btype_t btype, const void *value_a, const void *value_b)
+{
+	switch(btype)
+	{
+		//Use macro-trick to cast to the appropriate type and compare.
+		#define BTYPE_MAC(etype, ctype) case etype: return ((*(const ctype*)value_a) == (*(const ctype*)value_b));
+		#include "btype_mac.def"
+		#undef BTYPE_MAC
+		default: abort(); //todo		
+	}
+}
+
+bool btype_lt(btype_t btype, const void *value_a, const void *value_b)
+{
+	switch(btype)
+	{
+		//Use macro-trick to cast to the appropriate type and compare.
+		#define BTYPE_MAC_NOCOMPLEX
+		#define BTYPE_MAC(etype, ctype) case etype: return ((*(const ctype*)value_a) < (*(const ctype*)value_b));
+		#include "btype_mac.def"
+		#undef BTYPE_MAC
+		#undef BTYPE_MAC_NOCOMPLEX
+		default: abort(); //todo	
+	}
+}
+
+void *btype_conv(const void *value, btype_t from, btype_t to)
+{
+	void *retval = NULL;
+	switch(to)
+	{
+		//Use macro-trick to allocate right amount of memory
+		#define BTYPE_MAC(etype, ctype) case etype: retval = alloc_mandatory(sizeof(ctype)); break;
+		#include "btype_mac.def"
+		#undef BTYPE_MAC
+		default: abort();
+	}
+	
+	unsigned long long val_u;
+	_Complex long double val_d;
+	switch(from)
+	{
+		//Use macro-trick to read value
+		#define BTYPE_MAC(etype, ctype) \
+			case etype: \
+			val_u = (*(const ctype*)value);\
+			val_d = (*(const ctype*)value);\
+			break;
+		
+		#include "btype_mac.def"
+		#undef BTYPE_MAC
+		
+		default: abort();
+	}
+	
+	//Use macro-trick to write value
+	//Handle floating/non-floating by overwriting result for non-floats
+	switch(to)
+	{
+		#define BTYPE_MAC(etype, ctype) case etype: (*(ctype*)retval) = val_u; break;
+		#include "btype_mac.def"
+		#undef BTYPE_MAC
+		default: abort();
+	}
+	
+	switch(to)
+	{
+		#define BTYPE_MAC_NOFLOAT
+		#define BTYPE_MAC(etype, ctype) case etype: (*(ctype*)retval) = val_d; break;
+		#include "btype_mac.def"
+		#undef BTYPE_MAC
+		#undef BTYPE_MAC_NOFLOAT
+		default: abort();
+	}
+	
+	return retval;
 }

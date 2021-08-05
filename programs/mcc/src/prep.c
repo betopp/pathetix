@@ -77,32 +77,8 @@ static void prep_d_if(tok_t *afterkey, tok_t *end)
 	tok_t *if_toks = tok_copy(afterkey, end);
 	
 	//Process tokens for macro replacement
-	tok_t *mm = if_toks;
-	while(mm != NULL)
-	{
-		tok_t *replaced_start = NULL;
-		tok_t *replaced_end = NULL;
-		tok_t *replaced_follow = NULL;
-		macro_process(mm, &replaced_start, &replaced_end, &replaced_follow);		
-		
-		if(if_toks == mm)
-		{
-			//Processed the first token
-			if(replaced_start == NULL)
-			{
-				//Deleted the first token
-				if_toks = replaced_follow;
-			}
-			else
-			{
-				//Replaced the first token
-				if_toks = replaced_start;
-			}
-		}
-		
-		mm = replaced_follow;
-	}
-	
+	if_toks = macro_process(if_toks);
+
 	//Any remaining identifiers are converted to preprocessor number 0
 	for(tok_t *rr = if_toks; rr != NULL; rr = rr->next)
 	{
@@ -353,12 +329,7 @@ void prep_pass(tok_t *tok)
 			}
 			else
 			{
-				//If the token passes preprocessor conditionals, do macro-replacement
-				tok_t *replace_start = NULL;
-				tok_t *replace_end = NULL;
-				tok_t *replace_follow = NULL;
-				macro_process(tt_start, &replace_start, &replace_end, &replace_follow);
-				tt_start = replace_follow;
+				tt_start = tt_start->next;
 				continue;
 			}
 		}
@@ -382,6 +353,26 @@ void prep_pass(tok_t *tok)
 		//Optionally, new tokens will be inserted in its place.
 		//Continue preprocessing from the same newline that once started the directive.
 		continue;
+	}
+	
+	//Run through the file and evaluate macros
+	tt_start = tok;
+	while(tt_start != NULL)
+	{
+		//Process line we're looking at
+		tt_start = macro_process(tt_start);
+		
+		//Advance until a newline or EOF
+		while(tt_start != NULL && tt_start->type != TOK_NEWLINE && tt_start->type != TOK_EOF)
+		{
+			tt_start = tt_start->next;
+		}
+		
+		//Advance past newline/EOF
+		while(tt_start != NULL && (tt_start->type == TOK_NEWLINE || tt_start->type == TOK_EOF))
+		{
+			tt_start = tt_start->next;
+		}
 	}
 }
 

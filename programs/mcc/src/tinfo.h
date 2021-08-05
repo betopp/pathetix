@@ -51,10 +51,13 @@ typedef struct tinfo_s
 } tinfo_t;
 
 //Returns true if the given data should be considered "nonzero" in the given type info
-bool tinfo_val_nz(const tinfo_t *tinfo, void *value);
+bool tinfo_val_nz(const tinfo_t *tinfo, const void *value);
 
 //Returns true if the given data should be considered equal
-bool tinfo_val_eq(const tinfo_t *tinfo_a, void *value_a, const tinfo_t *tinfo_b, void *value_b);
+bool tinfo_val_eq(const tinfo_t *tinfo_a, const void *value_a, const tinfo_t *tinfo_b, const void *value_b);
+
+//Returns true if the first data compares less than the second
+bool tinfo_val_lt(const tinfo_t *tinfo_a, const void *value_a, const tinfo_t *tinfo_b, const void *value_b);
 
 //Returns true if the given type is an arithmetic type
 bool tinfo_is_arith(const tinfo_t *tinfo);

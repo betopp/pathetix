@@ -1,0 +1,26 @@
+//btype_mac.def
+//Invocations of BTYPE_MAC for basic-type macro-tricks.
+//Bryan E. Topp <betopp@betopp.com> 2021
+
+BTYPE_MAC(BTYPE_BOOL,         _Bool                   )
+BTYPE_MAC(BTYPE_CHAR,         char                    )
+BTYPE_MAC(BTYPE_SCHAR,        signed char             )
+BTYPE_MAC(BTYPE_SHORTINT,     short int               )
+BTYPE_MAC(BTYPE_INT,          int                     )
+BTYPE_MAC(BTYPE_LONGINT,      long int                )
+BTYPE_MAC(BTYPE_LONGLONGINT,  long long int           )
+BTYPE_MAC(BTYPE_UCHAR,        unsigned char           )
+BTYPE_MAC(BTYPE_USHORTINT,    unsigned short int      )
+BTYPE_MAC(BTYPE_UINT,         unsigned int            )
+BTYPE_MAC(BTYPE_ULONGINT,     unsigned long int       )
+BTYPE_MAC(BTYPE_ULONGLONGINT, unsigned long long int  )
+#ifndef BTYPE_MAC_NOFLOAT
+	BTYPE_MAC(BTYPE_FLOAT,        float                   )
+	BTYPE_MAC(BTYPE_DOUBLE,       double                  )
+	BTYPE_MAC(BTYPE_LONGDOUBLE,   long double             )
+	#ifndef BTYPE_MAC_NOCOMPLEX
+		BTYPE_MAC(BTYPE_CFLOAT,       _Complex float          )
+		BTYPE_MAC(BTYPE_CDOUBLE,      _Complex double         )
+		BTYPE_MAC(BTYPE_CLONGDOUBLE,  _Complex long double    )
+	#endif //BTYPE_MAC_NOCOMPLEX
+#endif //BTYPE_MAC_NOFLOAT

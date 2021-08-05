@@ -11,38 +11,16 @@
 #include <stdint.h>
 
 //Returns true if the given data should be considered "nonzero" in the given type info
-bool tinfo_val_nz(const tinfo_t *tinfo, void *value)
+bool tinfo_val_nz(const tinfo_t *tinfo, const void *value)
 {
 	if(tinfo->cat == TINFO_BTYPE)
 	{
-		//Basic type.
-		switch(tinfo->btype)
-		{
-			case BTYPE_BOOL:         return (*(bool*)value                  ) != 0;
-			case BTYPE_CHAR:         return (*(char*)value                  ) != 0;
-			case BTYPE_SCHAR:        return (*(signed char*)value           ) != 0;
-			case BTYPE_SHORTINT:     return (*(short int*)value             ) != 0;
-			case BTYPE_INT:          return (*(int*)value                   ) != 0;
-			case BTYPE_LONGINT:      return (*(long int*)value              ) != 0;
-			case BTYPE_LONGLONGINT:  return (*(long long int*)value         ) != 0;
-			case BTYPE_UCHAR:        return (*(unsigned char*)value         ) != 0;
-			case BTYPE_USHORTINT:    return (*(short int*)value             ) != 0;
-			case BTYPE_UINT:         return (*(unsigned int*)value          ) != 0;
-			case BTYPE_ULONGINT:     return (*(unsigned long int*)value     ) != 0;
-			case BTYPE_ULONGLONGINT: return (*(unsigned long long int*)value) != 0;
-			case BTYPE_FLOAT:        return (*(float*)value                 ) != 0;
-			case BTYPE_DOUBLE:       return (*(double*)value                ) != 0;
-			case BTYPE_LONGDOUBLE:   return (*(long double*)value           ) != 0;
-			case BTYPE_CFLOAT:       return (*(_Complex float*)value        ) != 0;
-			case BTYPE_CDOUBLE:      return (*(_Complex double*)value       ) != 0;
-			case BTYPE_CLONGDOUBLE:  return (*(_Complex long double*)value  ) != 0;
-			default: abort(); //todo
-		}
+		return btype_nz(tinfo->btype, value);
 	}
 	abort(); //todo
 }
 
-bool tinfo_val_eq(const tinfo_t *tinfo_a, void *value_a, const tinfo_t *tinfo_b, void *value_b)
+bool tinfo_val_eq(const tinfo_t *tinfo_a, const void *value_a, const tinfo_t *tinfo_b, const void *value_b)
 {
 	if(tinfo_a->cat != tinfo_b->cat)
 	{
@@ -56,34 +34,40 @@ bool tinfo_val_eq(const tinfo_t *tinfo_a, void *value_a, const tinfo_t *tinfo_b,
 		abort();
 	}
 	
-	if(tinfo_a->btype != tinfo_b->btype)
+	btype_t arith_btype = btype_for_arithmetic(tinfo_a->btype, tinfo_b->btype);
+	
+	void *a_conv = btype_conv(value_a, tinfo_a->btype, arith_btype);
+	void *b_conv = btype_conv(value_b, tinfo_b->btype, arith_btype);
+	bool result = btype_eq(arith_btype, a_conv, b_conv);
+	free(a_conv);
+	free(b_conv);
+	
+	return result;
+}
+
+bool tinfo_val_lt(const tinfo_t *tinfo_a, const void *value_a, const tinfo_t *tinfo_b, const void *value_b)
+{
+	if(tinfo_a->cat != tinfo_b->cat)
 	{
 		//todo
 		abort();
 	}
 	
-	switch(tinfo_a->btype)
+	if(tinfo_a->cat != TINFO_BTYPE)
 	{
-		case BTYPE_BOOL:         return (*(bool*)value_a                  ) == (*(bool*)value_b                  );
-		case BTYPE_CHAR:         return (*(char*)value_a                  ) == (*(char*)value_b                  );
-		case BTYPE_SCHAR:        return (*(signed char*)value_a           ) == (*(signed char*)value_b           );
-		case BTYPE_SHORTINT:     return (*(short int*)value_a             ) == (*(short int*)value_b             );
-		case BTYPE_INT:          return (*(int*)value_a                   ) == (*(int*)value_b                   );
-		case BTYPE_LONGINT:      return (*(long int*)value_a              ) == (*(long int*)value_b              );
-		case BTYPE_LONGLONGINT:  return (*(long long int*)value_a         ) == (*(long long int*)value_b         );
-		case BTYPE_UCHAR:        return (*(unsigned char*)value_a         ) == (*(unsigned char*)value_b         );
-		case BTYPE_USHORTINT:    return (*(short int*)value_a             ) == (*(short int*)value_b             );
-		case BTYPE_UINT:         return (*(unsigned int*)value_a          ) == (*(unsigned int*)value_b          );
-		case BTYPE_ULONGINT:     return (*(unsigned long int*)value_a     ) == (*(unsigned long int*)value_b     );
-		case BTYPE_ULONGLONGINT: return (*(unsigned long long int*)value_a) == (*(unsigned long long int*)value_b);
-		case BTYPE_FLOAT:        return (*(float*)value_a                 ) == (*(float*)value_b                 );
-		case BTYPE_DOUBLE:       return (*(double*)value_a                ) == (*(double*)value_b                );
-		case BTYPE_LONGDOUBLE:   return (*(long double*)value_a           ) == (*(long double*)value_b           );
-		case BTYPE_CFLOAT:       return (*(_Complex float*)value_a        ) == (*(_Complex float*)value_b        );
-		case BTYPE_CDOUBLE:      return (*(_Complex double*)value_a       ) == (*(_Complex double*)value_b       );
-		case BTYPE_CLONGDOUBLE:  return (*(_Complex long double*)value_a  ) == (*(_Complex long double*)value_b  );
-		default: abort(); //todo		
+		//todo
+		abort();
 	}
+	
+	btype_t arith_btype = btype_for_arithmetic(tinfo_a->btype, tinfo_b->btype);
+	
+	void *a_conv = btype_conv(value_a, tinfo_a->btype, arith_btype);
+	void *b_conv = btype_conv(value_b, tinfo_b->btype, arith_btype);
+	bool result = btype_lt(arith_btype, a_conv, b_conv);
+	free(a_conv);
+	free(b_conv);
+	
+	return result;	
 }
 
 bool tinfo_is_arith(const tinfo_t *tinfo)

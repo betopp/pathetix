@@ -237,17 +237,21 @@ tok_t *tok_read(FILE *fd)
 		//If a block comment is encountered, skip until it ends
 		if(next[0] == '/' && next[1] == '*')
 		{
-			while( (next[1] != '\0') && (next[0] != '*' || next[1] != '/') )
+			//Scan for terminating "*" "/" pair
+			while(!(next[0] == '*' && next[1] == '/'))
 			{
+				if(next[0] == '\0' || next[1] == '\0')
+				{
+					fprintf(stderr, "end-of-file encountered during block comment\n");
+					exit(-1);
+				}
+				
 				next++;
 				immediate = false;
 			}
 			
-			if(next[0] == '\0' || next[1] == '\0')
-			{
-				fprintf(stderr, "end-of-file encountered during block comment\n");
-				exit(-1);
-			}
+			//Skip the terminating pair
+			next += 2;
 		}
 		
 		if(next_old != next)
@@ -506,6 +510,15 @@ void tok_delete_single(tok_t *tok)
 	if(tok->text != NULL)
 		free(tok->text);
 	
+	if(tok->macros != NULL)
+	{
+		for(size_t mm = 0; mm < tok->nmacros; mm++)
+		{
+			free(tok->macros[mm]);
+		}
+		free(tok->macros);
+	}
+	
 	tok->prev = NULL;
 	tok->next = NULL;
 	tok->text = NULL;
@@ -577,6 +590,16 @@ tok_t *tok_copy(tok_t *first, tok_t *last)
 		tail->immediate = first->immediate;
 		tail->line = first->line;
 		
+		tail->nmacros = first->nmacros;
+		if(tail->nmacros > 0)
+		{
+			tail->macros = alloc_mandatory(tail->nmacros * sizeof(char*));
+			for(size_t mm = 0; mm < tail->nmacros; mm++)
+			{
+				tail->macros[mm] = strdup_mandatory(first->macros[mm]);
+			}
+		}
+		
 		//If we just copied the last token, we're done
 		if(first == last)
 		{
@@ -611,6 +634,16 @@ tok_t *tok_copy_all(tok_t *first)
 		tail->text = strdup_mandatory(first->text);
 		tail->immediate = first->immediate;
 		tail->line = first->line;
+		
+		tail->nmacros = first->nmacros;
+		if(tail->nmacros > 0)
+		{
+			tail->macros = alloc_mandatory(tail->nmacros * sizeof(char*));
+			for(size_t mm = 0; mm < tail->nmacros; mm++)
+			{
+				tail->macros[mm] = strdup_mandatory(first->macros[mm]);
+			}
+		}
 		
 		//If we just copied the last token, we're done
 		if(first->next == NULL)

@@ -117,7 +117,6 @@ typedef enum tok_type_e
 	TOK_MAX
 } tok_type_t;
 
-
 //A file is stored in memory as a doubly-linked list of tokens.
 //One link in such a list.
 typedef struct tok_s
@@ -128,6 +127,9 @@ typedef struct tok_s
 	int line; //Line where the token started
 	struct tok_s *prev; //Previous token in token list
 	struct tok_s *next; //Next token in token list
+	
+	char **macros; //Macros already used in the creation of this token
+	size_t nmacros; //Number of macros already used in the creation of this token
 } tok_t;
 
 //Reads the given file and converts it into a list of preprocessor tokens.

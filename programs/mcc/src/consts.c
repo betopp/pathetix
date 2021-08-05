@@ -43,12 +43,12 @@ void consts_intc(syntax_node_t *node)
 	while(remain[0] != '\0')
 	{
 		int digval = 0;
-		if(remain[0] >= 'a' && remain[0] <= 'z')
+		if(remain[0] >= 'a' && remain[0] <= 'f')
 		{
 			//Digit at least 10, represented by lowercase letter
 			digval = 10 + remain[0] - 'a';
 		}
-		else if(remain[0] >= 'A' && remain[0] <= 'Z')
+		else if(remain[0] >= 'A' && remain[0] <= 'F')
 		{
 			//Digit at least 10, represented by uppercase letter
 			digval = 10 + remain[0] - 'A';
