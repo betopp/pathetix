@@ -169,17 +169,21 @@ bool btype_lt(btype_t btype, const void *value_a, const void *value_b)
 	}
 }
 
-void *btype_conv(const void *value, btype_t from, btype_t to)
+static void *btype_alloc(btype_t t)
 {
-	void *retval = NULL;
-	switch(to)
+	switch(t)
 	{
 		//Use macro-trick to allocate right amount of memory
-		#define BTYPE_MAC(etype, ctype) case etype: retval = alloc_mandatory(sizeof(ctype)); break;
+		#define BTYPE_MAC(etype, ctype) case etype: return alloc_mandatory(sizeof(ctype));
 		#include "btype_mac.def"
 		#undef BTYPE_MAC
 		default: abort();
 	}
+}
+
+void *btype_conv(const void *value, btype_t from, btype_t to)
+{
+	void *retval = btype_alloc(to);
 	
 	unsigned long long val_u;
 	_Complex long double val_d;
@@ -220,3 +224,36 @@ void *btype_conv(const void *value, btype_t from, btype_t to)
 	
 	return retval;
 }
+
+void *btype_add(const void *v1, const void *v2, btype_t t)
+{
+	void *retval = btype_alloc(t);
+	
+	switch(t)
+	{
+		//Use macro-trick to cast to the appropriate type and operate
+		#define BTYPE_MAC(etype, ctype) case etype: *(ctype*)retval = ((*(ctype*)v1) + (*(ctype*)v2)); break;
+		#include "btype_mac.def"
+		#undef BTYPE_MAC
+		default: abort(); //todo		
+	}
+	
+	return retval;
+}
+
+void *btype_sub(const void *v1, const void *v2, btype_t t)
+{
+	void *retval = btype_alloc(t);
+	
+	switch(t)
+	{
+		//Use macro-trick to cast to the appropriate type and operate
+		#define BTYPE_MAC(etype, ctype) case etype: *(ctype*)retval = ((*(ctype*)v1) - (*(ctype*)v2)); break;
+		#include "btype_mac.def"
+		#undef BTYPE_MAC
+		default: abort(); //todo		
+	}
+	
+	return retval;
+}
+

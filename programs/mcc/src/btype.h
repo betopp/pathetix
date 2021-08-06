@@ -60,6 +60,12 @@ bool btype_nz(btype_t btype, const void *value);
 //Converts a value from one basic type to another. Returns newly allocated memory containing the new value.
 void *btype_conv(const void *value, btype_t from, btype_t to);
 
+//Adds two values of a given basic type. Returns newly allocated memory containing the result.
+void *btype_add(const void *v1, const void *v2, btype_t t);
+
+//Subtracts two values of a given basic type. Returns newly allocated memory containing the result.
+void *btype_sub(const void *v1, const void *v2, btype_t t);
+
 #endif //BTYPE_H
 
 

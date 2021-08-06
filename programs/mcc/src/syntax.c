@@ -786,6 +786,45 @@ void syntax_doconst(syntax_node_t *node)
 		
 		return;
 	}
+	
+	//Handle arithmetic
+	if(node->type == S_ADDITIVE_EXPRESSION)
+	{
+		//Child 0 and 2 are operands. Child 1 is + or -.
+		syntax_doconst(node->children[0]);
+		syntax_doconst(node->children[2]);
+		
+		//Arithmetic only happens between basic types
+		if(node->children[0]->tinfo->cat != TINFO_BTYPE)
+			tok_err(node->children[0]->start, "arithmetic on non-basic type");
+		if(node->children[2]->tinfo->cat != TINFO_BTYPE)
+			tok_err(node->children[2]->start, "arithmetic on non-basic type");
+				
+		//Result is of appropriate basic type
+		btype_t rtype = btype_for_arithmetic(node->children[0]->tinfo->btype, node->children[2]->tinfo->btype);
+		node->tinfo = tinfo_for_basic(rtype);
+		
+		//Result is const if both operands are
+		if(node->children[0]->value != NULL && node->children[2]->value != NULL)
+		{
+			void *conv_a = btype_conv(node->children[0]->value, node->children[0]->tinfo->btype, rtype);
+			void *conv_b = btype_conv(node->children[2]->value, node->children[2]->tinfo->btype, rtype);
+			switch((tok_type_t)(node->children[1]->type))
+			{
+				case TOK_PLUS:
+					node->value = btype_add(conv_a, conv_b, rtype);
+					break;
+				case TOK_MINUS:
+					node->value = btype_sub(conv_a, conv_b, rtype);
+					break;
+				default: abort();
+			}
+			free(conv_a);
+			free(conv_b);
+		}
+		
+		return;
+	}
 		
 	//Todo - handle other expressions
 	abort();
