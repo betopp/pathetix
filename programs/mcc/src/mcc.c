@@ -6,6 +6,7 @@
 #include "prep.h"
 #include "dirs.h"
 #include "alloc.h"
+#include "macro.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +18,9 @@ int main(int argc, const char **argv)
 		printf("usage: %s input\n", argv[0]);
 		exit(0);
 	}
+	
+	//Set up built-in macros
+	macro_init();
 	
 	//Add system include directories
 	dirs_add(DIRS_SYS, "/usr/include");
@@ -64,6 +68,8 @@ int main(int argc, const char **argv)
 		if(tt->text[0] == ';')
 			printf("\n");
 	}
+	
+	printf("\n");
 	
 	return 0;
 }

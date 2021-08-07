@@ -19,12 +19,28 @@ typedef struct macro_s
 	bool funclike; //Whether this macro is function-like (true) or object-like (false)
 	char **params; //Parameters of the macro, NULL-terminated array of NUL-terminated string pointers.
 	size_t nparams; //Number of parameters the macro takes
+	bool variadic; //Whether the other defined parameters are followed by a variadic parameter.
 	tok_t *toks; //Tokens that make up the body of the macro
-	
-	
 	
 } macro_t;
 static macro_t *macro_list;
+
+//Built-in macros
+static macro_t macro_builtins[] = 
+{
+	{ .name = "__GNUCLIKE_BUILTIN_VARARGS", .toks = &(tok_t){ .type = TOK_PNUMBER, .text = "1" } },
+	{ 0 },
+};
+
+void macro_init(void)
+{
+	//Link all builtins
+	for(int bb = 0; macro_builtins[bb].name != NULL; bb++)
+	{
+		macro_builtins[bb].next = macro_list;
+		macro_list = &(macro_builtins[bb]);
+	}
+}
 
 void macro_define(const char *name, tok_t *aftername)
 {
@@ -56,27 +72,40 @@ void macro_define(const char *name, tok_t *aftername)
 			//Empty list of parameters.
 			body = lparen->next->next;
 		}
-		else if(lparen->next->type == TOK_IDENT)
+		else if(lparen->next->type == TOK_IDENT || lparen->next->type == TOK_ELLIPS)
 		{
-			//At least one parameter.
+			//At least one parameter, or variadic.
 			//Figure out how many parameters we have and set aside all their names.
 			tok_t *param = lparen->next;
 			while(1)
 			{
-				//Should be looking at an identifier, the parameter
-				if(param->type != TOK_IDENT)
+				//Should be looking at an identifier, the parameter - or an ellipsis for variadic macros			
+				if(param->type == TOK_IDENT)
 				{
-					tok_err(param, "expected identifier");
+					if(mptr->variadic)
+					{
+						//If there was an ellipsis previously, that should have been the end
+						tok_err(param, "named parameter following \"...\"");
+					}
+					
+					//Increment count of parameters, and make space in parameter array
+					mptr->nparams++;
+					mptr->params = realloc_mandatory(mptr->params, (mptr->nparams + 1) * sizeof(const char*));
+					
+					//Copy the parameter name
+					mptr->params[mptr->nparams - 1] = strdup_mandatory(param->text);
+					mptr->params[mptr->nparams] = NULL;
 				}
-				
-				//Increment count of parameters, and make space in parameter array
-				mptr->nparams++;
-				mptr->params = realloc_mandatory(mptr->params, (mptr->nparams + 1) * sizeof(const char*));
-				
-				//Copy the parameter name
-				mptr->params[mptr->nparams - 1] = strdup_mandatory(param->text);
-				mptr->params[mptr->nparams] = NULL;
-				
+				else if(param->type == TOK_ELLIPS)
+				{
+					//Set to variadic, but don't name any more parameters
+					mptr->variadic = true;
+				}
+				else
+				{
+					tok_err(param, "expected identifier or \"...\"");
+				}
+					
 				//See what follows it
 				if(param->next->type == TOK_PARENR)
 				{
@@ -334,23 +363,28 @@ tok_t *macro_process(tok_t *line)
 			}
 			
 			//Need to see the right number of parameters
-			tok_t **parmvals_start = alloc_mandatory(sizeof(tok_t*) * (found->nparams + 1));
-			tok_t **parmvals_end = alloc_mandatory(sizeof(tok_t*) * (found->nparams + 1));
+			tok_t **parmvals_start = NULL;
+			tok_t **parmvals_end = NULL;
 			size_t parmnext = 0;
 			
 			//Parameters start after left-paren
 			src_end = line_pos->next->next;
 			while(1)
-			{
-				//If we have no more parameters, we should see a right-paren.
-				//Leave src_end pointing at the right-paren.
-				if(parmnext >= found->nparams)
+			{	
+				//See if we're looking at the right-paren that ends the macro invokation
+				if(src_end->type == TOK_PARENR)
 				{
-					if(src_end->type != TOK_PARENR)
+					if(parmnext < found->nparams)
 					{
-						tok_err(src_end, "expected ) at end of parameter list");
+						tok_err(src_end, "not enough parameters in macro usage");
 					}
 					
+					if( (parmnext > found->nparams) && !found->variadic)
+					{
+						tok_err(src_end, "too many parameters in macro usage");
+					}
+					
+					//Leave src_end pointing at the right-paren.
 					break;
 				}
 				
@@ -360,6 +394,12 @@ tok_t *macro_process(tok_t *line)
 				{
 					tok_err(src_end, "expected macro parameters");
 				}
+				
+				//Make space for storing reference to the new parameter
+				parmvals_start = realloc_mandatory(parmvals_start, (parmnext+1) * sizeof(tok_t*));
+				parmvals_end = realloc_mandatory(parmvals_end, (parmnext+1) * sizeof(tok_t*));
+				
+				//Store the token that starts it
 				parmvals_start[parmnext] = src_end;
 	
 				//Parameter continues until a comma or the matching right-paren.
@@ -389,14 +429,15 @@ tok_t *macro_process(tok_t *line)
 				
 				parmnext++;
 								
-				//Nonfinal parameter should be followed by comma
-				if(parmnext < found->nparams)
+				//Parameter should be followed by comma (nonfinal) or right-paren (final)
+				if(src_end->type != TOK_COMMA && src_end->type != TOK_PARENR)
 				{
-					if(src_end->type != TOK_COMMA)
-					{
-						tok_err(src_end, "expected , after macro parameter");
-					}
-					
+					tok_err(src_end, "expected , or ) after macro parameter");
+				}
+				
+				//Skip over the comma if present
+				if(src_end->type == TOK_COMMA)
+				{
 					src_end = src_end->next;
 				}
 			}
@@ -405,14 +446,24 @@ tok_t *macro_process(tok_t *line)
 			//Work through each token from the macro's definition.
 			for(tok_t *rr = found->toks; rr != NULL; rr = rr->next)
 			{
-				//See if this token, in the macro definition, refers to a parameter
+				//See if this token, in the macro definition, refers to a parameter, or to the variadic parameters
 				int subidx = -1;
-				for(int pp = 0; pp < found->nparams; pp++)
+				if(!strcmp(rr->text, "__VA_ARGS__"))
 				{
-					if(!strcmp(found->params[pp], rr->text))
+					if(!found->variadic)
+						tok_err(rr, "__VA_ARGS__ used in non-variadic macro");
+					
+					subidx = found->nparams;
+				}
+				else
+				{
+					for(int pp = 0; pp < found->nparams; pp++)
 					{
-						subidx = pp;
-						break;
+						if(!strcmp(found->params[pp], rr->text))
+						{
+							subidx = pp;
+							break;
+						}
 					}
 				}
 				
@@ -423,6 +474,18 @@ tok_t *macro_process(tok_t *line)
 					//This token from the macro definition isn't a parameter.
 					//Copy as-is.
 					copied = tok_copy(rr, rr);
+				}
+				else if(subidx == found->nparams)
+				{
+					//This token from the macro definition gets replaced with variadic parameters.
+					//Assume the sequence of tokens after the last defined parameter is all variadic parameters.
+					if(parmnext > found->nparams)
+					{
+						if(parmvals_start[found->nparams] != parmvals_end[parmnext-1])
+						{
+							copied = tok_copy(parmvals_start[found->nparams], parmvals_end[parmnext-1]->prev);
+						}
+					}
 				}
 				else
 				{
@@ -437,17 +500,23 @@ tok_t *macro_process(tok_t *line)
 				//Append to the replacement sequence (or not, for an empty parameter)
 				if(copied != NULL)
 				{
+					tok_t *copied_end = copied;
+					while(copied_end->next != NULL)
+					{
+						copied_end = copied_end->next;
+					}
+					
 					if(repl_start == NULL)
 					{
 						repl_start = copied;
-						repl_end = copied;
+						repl_end = copied_end;
 					}
 					else
 					{
 						repl_end->next = copied;
 						copied->prev = repl_end;
 						
-						repl_end = copied;
+						repl_end = copied_end;
 					}
 				}
 			}
@@ -495,8 +564,8 @@ tok_t *macro_process(tok_t *line)
 		}
 		else
 		{
-			src_start->prev->next = src_start->next;
-			src_start->next->prev = src_start->prev;
+			src_start->prev->next = src_end->next;
+			src_end->next->prev = src_start->prev;
 		}
 		
 		//Delete the replaced macro

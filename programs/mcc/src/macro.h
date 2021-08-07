@@ -8,6 +8,9 @@
 
 #include "tok.h"
 
+//Initializes macro definitions, including built-ins
+void macro_init(void);
+
 //Adds a macro definition
 void macro_define(const char *name, tok_t *aftername);
 

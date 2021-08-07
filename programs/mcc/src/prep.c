@@ -396,12 +396,22 @@ void prep_pass(tok_t *tok)
 	//Run through the file and evaluate all preprocessor directives.
 	//Directives begin with newline or start-of-file, then an octothorpe, then the rest of the line.
 	tok_t *tt_start = tok;
-	while(tt_start != NULL)
-	{
+	while(1)
+	{		
+		assert(tt_start != NULL && tt_start->type != TOK_NONE);
+		
 		//Advance past newlines/etc
 		if(tt_start->type == TOK_FILE || tt_start->type == TOK_NEWLINE || tt_start->type == TOK_EOF)
 		{
+			if(tt_start->next == NULL)
+			{
+				//This is the only place we should actually get to end-of-list - advancing past EOF.
+				assert(tt_start->type == TOK_EOF);
+				break;
+			}
+			
 			tt_start = tt_start->next;
+			assert(tt_start != NULL && tt_start->type != TOK_NONE);
 			continue;
 		}
 		
@@ -410,6 +420,8 @@ void prep_pass(tok_t *tok)
 		{
 			//The preprocessor directive continues until the following newline.
 			tt_start = tt_start->prev;
+			assert(tt_start != NULL && tt_start->type != TOK_NONE);
+			
 			tok_t *tt_end = tt_start->next;
 			while(tt_end->type != TOK_NEWLINE && tt_end->type != EOF)
 			{
@@ -425,6 +437,7 @@ void prep_pass(tok_t *tok)
 			//The directive will be deleted, leaving tt_start and tt_end (the newlines) untouched.
 			//Optionally, new tokens will be inserted in its place.
 			//Continue preprocessing from the same newline that once started the directive.
+			assert(tt_start != NULL && tt_start->type != TOK_NONE);
 			continue;
 		}
 		else
@@ -445,17 +458,24 @@ void prep_pass(tok_t *tok)
 				//Back up to the token before this line, and delete the line and try again.
 				tt_start = tt_start->prev;
 				tok_delete_range(delete_start, delete_end);
+				
+				assert(tt_start != NULL && tt_start->type != TOK_NONE);
 				continue;
 			}
 			else
 			{
 				//Run the line through macro replacement.
 				tt_start = macro_process(tt_start);
+				assert(tt_start != NULL && tt_start->type != TOK_NONE);
 				
 				//Advance to the end-of-line of the line we just processed.
 				while(tt_start->type != TOK_FILE && tt_start->type != TOK_NEWLINE && tt_start->type != TOK_EOF)
 				{
+					if(tt_start->next == NULL)
+						break;
+					
 					tt_start = tt_start->next;
+					assert(tt_start != NULL && tt_start->type != TOK_NONE);
 				}
 				
 				continue;
