@@ -12,6 +12,82 @@
 #include <assert.h>
 #include <string.h>
 
+//Printable names of syntax elements
+static const char * syntax_names[S_MAX] = 
+{
+	[S_PRIMARY_EXPRESSION] = "primary-expression",
+	[S_CONSTANT] = "constant",
+	[S_EXPRESSION] = "expression",
+	[S_POSTFIX_EXPRESSION] = "postfix-expression",
+	[S_ARGUMENT_EXPRESSION_LIST] = "argument-expression-list",
+	[S_TYPE_NAME] = "type-name",
+	[S_INITIALIZER_LIST] = "initializer-list",
+	[S_ASSIGNMENT_EXPRESSION] = "assignment-expression",
+	[S_CONSTANT_EXPRESSION] = "constant-expression",
+	[S_CONDITIONAL_EXPRESSION] = "conditional-expression",
+	[S_INCLUSIVE_OR_EXPRESSION] = "inclusive-or-expression",
+	[S_LOGICAL_AND_EXPRESSION] = "logical-and-expression",
+	[S_LOGICAL_OR_EXPRESSION] = "logical-or-expression",
+	[S_EXCLUSIVE_OR_EXPRESSION] = "exclusive-or-expression",
+	[S_AND_EXPRESSION] = "and-expression",
+	[S_EQUALITY_EXPRESSION] = "equality-expression",
+	[S_RELATIONAL_EXPRESSION] = "relational-expression",
+	[S_SHIFT_EXPRESSION] = "shift-expression",
+	[S_ADDITIVE_EXPRESSION] = "additive-expression",
+	[S_MULTIPLICATIVE_EXPRESSION] = "multiplicative-expression",
+	[S_CAST_EXPRESSION] = "cast-expression",
+	[S_UNARY_EXPRESSION] = "unary-expression",
+	[S_UNARY_OPERATOR] = "unary-operator",
+	[S_ENUMERATION_CONSTANT] = "enumeration-constant",
+	[S_ASSIGNMENT_OPERATOR] = "assignment-operator",
+	[S_SPECIFIER_QUALIFIER_LIST] = "specifier-qualifier-list",
+	[S_TYPE_SPECIFIER] = "type-specifier",
+	[S_ABSTRACT_DECLARATOR] = "abstract-declarator",
+	[S_DIRECT_ABSTRACT_DECLARATOR] = "direct-abstract-declarator",
+	[S_PARAMETER_TYPE_LIST] = "parameter-type-list",
+	[S_PARAMETER_LIST] = "parameter-list",
+	[S_TYPE_QUALIFIER] = "type-qualifier",
+	[S_STRUCT_OR_UNION_SPECIFIER] = "struct-or-union-specifier",
+	[S_ENUM_SPECIFIER] = "enum-specifier",
+	[S_TYPEDEF_NAME] = "typedef-name",
+	[S_POINTER] = "pointer",
+	[S_PARAMETER_DECLARATION] = "parameter-declaration",
+	[S_STRUCT_OR_UNION] = "struct-or-union",
+	[S_STRUCT_DECLARATION_LIST] = "struct-declaration-list",
+	[S_ENUMERATOR_LIST] = "enumerator-list",
+	[S_TYPE_QUALIFIER_LIST] = "type-qualifier-list",
+	[S_DECLARATION_SPECIFIERS] = "declaration-specifiers",
+	[S_DECLARATOR] = "declarator",
+	[S_STRUCT_DECLARATION] = "struct-declaration",
+	[S_ENUMERATOR] = "enumerator",
+	[S_STORAGE_CLASS_SPECIFIER] = "storage-class-specifier",
+	[S_FUNCTION_SPECIFIER] = "function-specifier",
+	[S_DIRECT_DECLARATOR] = "direct-declarator",
+	[S_STRUCT_DECLARATOR_LIST] = "struct-declarator-list",
+	[S_IDENTIFIER_LIST] = "identifier-list",
+	[S_STRUCT_DECLARATOR] = "struct-declarator",
+	[S_TRANSLATION_UNIT] = "translation-unit",
+	[S_EXTERNAL_DECLARATION] = "external-declaration",
+	[S_FUNCTION_DEFINITION] = "function-definition",
+	[S_DECLARATION] = "declaration",
+	[S_DECLARATION_LIST] = "declaration-list",
+	[S_COMPOUND_STATEMENT] = "compound-statement",
+	[S_INIT_DECLARATOR_LIST] = "init-declarator-list",
+	[S_INIT_DECLARATOR] = "init-declarator",
+	[S_INITIALIZER] = "initializer",
+	[S_BLOCK_ITEM_LIST] = "block-item-list",
+	[S_BLOCK_ITEM] = "block-item",
+	[S_STATEMENT] = "statement",
+	[S_LABELED_STATEMENT] = "labeled-statement",
+	[S_EXPRESSION_STATEMENT] = "expression-statement",
+	[S_SELECTION_STATEMENT] = "selection-statement",
+	[S_ITERATION_STATEMENT] = "iteration-statement",
+	[S_JUMP_STATEMENT] = "jump-statement",
+	[S_DESIGNATION] = "designation",
+	[S_DESIGNATOR_LIST] = "designator-list",
+	[S_DESIGNATOR] = "designator",
+};
+
 //Definition of C99 syntax. Possible sequences that make up each syntax element.
 //Major dimension is the syntax element being constructed - the larger one, which may contain others.
 //Middle dimension is each possibility for constructing that syntax element.
@@ -405,7 +481,257 @@ static const int syntax_options[S_MAX][SYNTAX_OPTIONS][SYNTAX_FANOUT+2] =
 		{'C', TOK_COLON, S_CONSTANT_EXPRESSION, 0},
 		{0}
 	},
+	[S_TRANSLATION_UNIT] = 
+	{
+		{'e', S_EXTERNAL_DECLARATION, 0},
+		{'t', S_TRANSLATION_UNIT, S_EXTERNAL_DECLARATION, 0},
+		{0},
+	},
+	[S_EXTERNAL_DECLARATION] = 
+	{
+		{'f', S_FUNCTION_DEFINITION, 0},
+		{'d', S_DECLARATION, 0},
+		{0},
+	},
+	[S_FUNCTION_DEFINITION] = 
+	{
+		{'d', S_DECLARATION_SPECIFIERS, S_DECLARATOR, S_DECLARATION_LIST, S_COMPOUND_STATEMENT, 0},
+		{'D', S_DECLARATION_SPECIFIERS, S_DECLARATOR, S_COMPOUND_STATEMENT, 0},
+		{0},
+	},
+	[S_DECLARATION] = 
+	{
+		{'s', S_DECLARATION_SPECIFIERS, S_INIT_DECLARATOR_LIST, TOK_SCOLON, 0},
+		{'S', S_DECLARATION_SPECIFIERS, TOK_SCOLON, 0},
+		{0},
+	},
+	[S_DECLARATION_LIST] = 
+	{
+		{'d', S_DECLARATION, 0},
+		{'l', S_DECLARATION_LIST, S_DECLARATION, 0},
+		{0},
+	},
+	[S_COMPOUND_STATEMENT] = 
+	{
+		{'b', TOK_BRACEL, S_BLOCK_ITEM_LIST, TOK_BRACER, 0},
+		{'B', TOK_BRACEL, TOK_BRACER, 0},
+		{0}
+	},
+	[S_INIT_DECLARATOR_LIST] = 
+	{
+		{'i', S_INIT_DECLARATOR, 0},
+		{'l', S_INIT_DECLARATOR_LIST, TOK_COMMA, S_INIT_DECLARATOR, 0},
+		{0}
+	},
+	[S_INIT_DECLARATOR] = 
+	{
+		{'d', S_DECLARATOR, 0},
+		{'e', S_DECLARATOR, TOK_EQU, S_INITIALIZER, 0},
+		{0},
+	},
+	[S_INITIALIZER] = 
+	{
+		{'a', S_ASSIGNMENT_EXPRESSION, 0},
+		{'b', TOK_BRACEL, S_INITIALIZER_LIST, TOK_BRACER, 0},
+		{'c', TOK_BRACEL, S_INITIALIZER_LIST, TOK_COMMA, TOK_BRACER, 0},
+		{0}
+	},
+	[S_BLOCK_ITEM_LIST] =
+	{
+		{'b', S_BLOCK_ITEM, 0},
+		{'l', S_BLOCK_ITEM_LIST, S_BLOCK_ITEM, 0},
+		{0},
+	},
+	[S_BLOCK_ITEM] = 
+	{
+		{'d', S_DECLARATION, 0},
+		{'s', S_STATEMENT, 0},
+		{0}
+	},
+	[S_STATEMENT] = 
+	{
+		{'l', S_LABELED_STATEMENT, 0},
+		{'c', S_COMPOUND_STATEMENT, 0},
+		{'e', S_EXPRESSION_STATEMENT, 0},
+		{'s', S_SELECTION_STATEMENT, 0},
+		{'i', S_ITERATION_STATEMENT, 0},
+		{'j', S_JUMP_STATEMENT, 0},
+		{0}
+	},
+	[S_LABELED_STATEMENT] = 
+	{
+		{'i', TOK_IDENT, TOK_COLON, S_STATEMENT, 0},
+		{'c', TOK_CASE, S_CONSTANT_EXPRESSION, TOK_COLON, S_STATEMENT, 0},
+		{'d', TOK_DEFAULT, TOK_COLON, S_STATEMENT, 0},
+		{0}
+	},
+	[S_EXPRESSION_STATEMENT] = 
+	{
+		{'e', S_EXPRESSION, TOK_SCOLON, 0},
+		{'E', TOK_SCOLON, 0},
+		{0}
+	},
+	[S_SELECTION_STATEMENT] = 
+	{
+		{'i', TOK_IF, TOK_PARENL, S_EXPRESSION, TOK_PARENR, S_STATEMENT, 0},
+		{'e', TOK_IF, TOK_PARENL, S_EXPRESSION, TOK_PARENR, S_STATEMENT, TOK_ELSE, S_STATEMENT, 0},
+		{'s', TOK_SWITCH, TOK_PARENL, S_EXPRESSION, TOK_PARENR, S_STATEMENT, 0},
+		{0}
+	},
+	[S_ITERATION_STATEMENT] = 
+	{
+		{'w', TOK_WHILE, TOK_PARENL, S_EXPRESSION, TOK_PARENR, S_STATEMENT, 0},
+		{'d', TOK_DO, S_STATEMENT, TOK_WHILE, TOK_PARENL, S_EXPRESSION, TOK_PARENR, TOK_SCOLON, 0},
+		{'f', TOK_FOR, TOK_PARENL, S_EXPRESSION, TOK_SCOLON, S_EXPRESSION, TOK_SCOLON, S_EXPRESSION, TOK_PARENR, S_STATEMENT, 0},
+		{'g', TOK_FOR, TOK_PARENL,               TOK_SCOLON, S_EXPRESSION, TOK_SCOLON, S_EXPRESSION, TOK_PARENR, S_STATEMENT, 0},
+		{'h', TOK_FOR, TOK_PARENL, S_EXPRESSION, TOK_SCOLON,               TOK_SCOLON, S_EXPRESSION, TOK_PARENR, S_STATEMENT, 0},
+		{'i', TOK_FOR, TOK_PARENL,               TOK_SCOLON,               TOK_SCOLON, S_EXPRESSION, TOK_PARENR, S_STATEMENT, 0},
+		{'j', TOK_FOR, TOK_PARENL, S_EXPRESSION, TOK_SCOLON, S_EXPRESSION, TOK_SCOLON,               TOK_PARENR, S_STATEMENT, 0},
+		{'k', TOK_FOR, TOK_PARENL,               TOK_SCOLON, S_EXPRESSION, TOK_SCOLON,               TOK_PARENR, S_STATEMENT, 0},
+		{'l', TOK_FOR, TOK_PARENL, S_EXPRESSION, TOK_SCOLON,               TOK_SCOLON,               TOK_PARENR, S_STATEMENT, 0},
+		{'m', TOK_FOR, TOK_PARENL,               TOK_SCOLON,               TOK_SCOLON,               TOK_PARENR, S_STATEMENT, 0},
+		{'n', TOK_FOR, TOK_PARENL, S_DECLARATION, S_EXPRESSION, TOK_SCOLON, S_EXPRESSION, TOK_PARENR, S_STATEMENT, 0},
+		{'o', TOK_FOR, TOK_PARENL, S_DECLARATION,               TOK_SCOLON, S_EXPRESSION, TOK_PARENR, S_STATEMENT, 0},
+		{'p', TOK_FOR, TOK_PARENL, S_DECLARATION, S_EXPRESSION, TOK_SCOLON,               TOK_PARENR, S_STATEMENT, 0},
+		{'q', TOK_FOR, TOK_PARENL, S_DECLARATION,               TOK_SCOLON,               TOK_PARENR, S_STATEMENT, 0},
+		{0}
+	},
+	[S_JUMP_STATEMENT] = 
+	{
+		{'g', TOK_GOTO, TOK_IDENT, TOK_SCOLON, 0},
+		{'c', TOK_CONTINUE, TOK_SCOLON, 0},
+		{'b', TOK_BREAK, TOK_SCOLON, 0},
+		{'r', TOK_RETURN, S_EXPRESSION, TOK_SCOLON, 0},
+		{'R', TOK_RETURN, TOK_SCOLON, 0},
+		{0}
+	},
+	[S_INITIALIZER_LIST] = 
+	{
+		{'d', S_DESIGNATION, S_INITIALIZER, 0},
+		{'D', S_INITIALIZER, 0},
+		{'l', S_INITIALIZER_LIST, TOK_COMMA, S_DESIGNATION, S_INITIALIZER, 0},
+		{'L', S_INITIALIZER_LIST, TOK_COMMA, S_INITIALIZER, 0},
+		{0}
+	},
+	[S_DESIGNATION] = 
+	{
+		{'d', S_DESIGNATOR_LIST, TOK_EQU, 0},
+		{0}
+	},
+	[S_DESIGNATOR_LIST] = 
+	{
+		{'d', S_DESIGNATOR, 0},
+		{'l', S_DESIGNATOR_LIST, S_DESIGNATOR, 0},
+		{0}
+	},
+	[S_DESIGNATOR] = 
+	{
+		{'b', TOK_BRACKL, S_CONSTANT_EXPRESSION, TOK_BRACKR, 0},
+		{'d', TOK_DOT, TOK_IDENT, 0},
+		{0}
+	},
 };
+
+//First and follow sets for each syntax element
+static uint8_t syntax_first[S_MAX][ (TOK_MAX + 7) / 8 ];
+static uint8_t syntax_follow[S_MAX][ (TOK_MAX + 7) / 8 ];
+
+//Propagates a first/follow set - elements from the "from" parameter are OR'd into the "into" parameter.
+//Returns whether any changes were made.
+static bool syntax_firstfollow_combine(uint8_t into[(TOK_MAX+7)/8], uint8_t from[(TOK_MAX+7)/8])
+{
+	bool retval = false;
+	
+	for(int tt = 0; tt < (TOK_MAX+7)/8; tt++)
+	{
+		uint8_t old = into[tt];
+		into[tt] |= from[tt];
+		if(into[tt] != old)
+			retval = true;
+	}
+	
+	return retval;
+}
+
+void syntax_init(void)
+{
+	//Init tables of which tokens are permissible in starting or following a syntax element.
+	
+	//Start by defining all tokens as only able to begin with themselves.
+	for(int tt = TOK_NONE + 1; tt < TOK_MAX; tt++)
+	{
+		syntax_first[tt][tt / 8] = 1 << (tt % 8);
+	}
+	
+	//Run through all options for all syntax elements.
+	//If an element is seen following another, its "first" set is included in the other's "follow".
+	//If an element is seen at the beginning of a larger element, its "first" is included in the outer's "first".
+	//Do this iteratively until no sets are changed.
+	while(1)
+	{
+		bool any_changed = false;
+		for(int ss = S_START + 1; ss < S_MAX; ss++)
+		{
+			assert(syntax_options[ss][0][0] != 0);
+			for(int oo = 0; syntax_options[ss][oo][0] != 0; oo++)
+			{
+				//Tokens that can begin the first subelement, can begin the overall element
+				int first = syntax_options[ss][oo][1];
+				assert(first != 0);
+				any_changed = any_changed || syntax_firstfollow_combine(syntax_first[ss], syntax_first[first]);
+				
+				//Tokens that begin subsequent subelements can follow the prior subelement.
+				for(int ee = 2; syntax_options[ss][oo][ee] != 0; ee++)
+				{
+					int prev_elem = syntax_options[ss][oo][ee-1];
+					int this_elem = syntax_options[ss][oo][ee];
+					bool ch = syntax_firstfollow_combine(syntax_follow[prev_elem], syntax_first[this_elem]);
+					any_changed = any_changed || ch;
+				}
+				
+				//Tokens that follow the larger element can follow its last subelement
+				int last = 0;
+				for(int ee = 1; syntax_options[ss][oo][ee] != 0; ee++)
+				{
+					last = syntax_options[ss][oo][ee];
+				}
+				assert(last != 0);
+				any_changed = any_changed || syntax_firstfollow_combine(syntax_follow[last], syntax_follow[ss]);
+			}
+		}
+		
+		if(!any_changed)
+			break;
+	}
+	
+	//Print tables for checking
+	printf("First:\n");
+	for(int ss = S_START; ss < S_MAX; ss++)
+	{
+		printf("\t%s: ", syntax_names[ss]);
+		for(int tt = 0; tt < TOK_MAX; tt++)
+		{
+			if(syntax_first[ss][tt/8] & (1 << (tt%8)))
+			{
+				printf("%s ", tok_typename(&(tok_t){.type = tt}));
+			}
+		}
+		printf("\n");
+	}
+	printf("Follow:\n");
+	for(int ss = S_START; ss < S_MAX; ss++)
+	{
+		printf("\t%s: ", syntax_names[ss]);
+		for(int tt = 0; tt < TOK_MAX; tt++)
+		{
+			if(syntax_follow[ss][tt/8] & (1 << (tt%8)))
+			{
+				printf("%s ", tok_typename(&(tok_t){.type = tt}));
+			}
+		}
+		printf("\n");
+	}
+}
 
 //Frees a syntax node and all children.
 void syntax_free(syntax_node_t *n)
@@ -420,171 +746,189 @@ void syntax_free(syntax_node_t *n)
 	free(n);
 }
 
-//Tries to match a single possible construction of the given syntax
-static syntax_node_t *syntax_try_option(syntax_type_t type, int option, tok_t *start, tok_t *end)
-{
-	//See if this option begins with a left-recursion.
-	//If so, we need to prevent infinite recursion in trying to match children.
-	//The left-recursive option will contain some token following its left-recursion.
-	//Necessarily, we'll consume one such token if we match the option at this level.
-	//So pull back the end prior to that token when recursing deeper.
-	tok_t *lrend = end;
-	if(syntax_options[type][option][1] == type)
-	{
-		//Left-recursive definition.
-		//Find a token that gets consumed by the definition to limit our recursion.
-		tok_type_t limiting_tok = 0;
-		for(int tt = 1; syntax_options[type][option][tt] != 0; tt++)
-		{
-			int required = syntax_options[type][option][tt];
-			if(required > TOK_NONE && required < TOK_MAX)
-			{
-				limiting_tok = required;
-				break;
-			}
-		}
-		
-		//Left-recursive definitions all contain at least one token directly
-		assert(limiting_tok != 0);
-		
-		//Back up the ending token until we consume one of these tokens
-		while( (lrend != start) && (lrend->type != limiting_tok) )
-		{
-			lrend = lrend->prev;
-		}
-		
-		if(lrend == start)
-		{
-			//Didn't find the token we'll need in the left-recursive definition.
-			//We can't use this left-recursive option.
-			//(Or, the token we found is literally the first token, which doesn't work either.)
-			return NULL;
-		}
-		
-		//Found the token we need at this depth - limit recursive search to one token prior.
-		lrend = lrend->prev;
-	}
-	
-	//Allocate space for the node
-	syntax_node_t *n = alloc_mandatory(sizeof(syntax_node_t));
-	n->type = type;
-	n->option = syntax_options[type][option][0];
-	n->start = start;
-	n->ntoks = 0;
-	
-	//Remaining tokens that further children should match
-	tok_t *unmatched = start;
-	
-	//Try to match all children
-	for(int chidx = 0; chidx < SYNTAX_FANOUT; chidx++)
-	{
-		//See if there's no more children to match - if so, we've succeeded
-		syntax_type_t chtype = syntax_options[type][option][chidx+1];
-		if(chtype == 0)
-			break;
-		
-		//See if we can use the whole remaining token series (normal children)
-		//or if we limit how much we consume (left-recursive children)
-		tok_t *chend = end;
-		if(chidx == 0 && lrend != NULL)
-			chend = lrend; //Left-recursive - limit range so we don't infinitely recurse
-		
-		//Attempt to match the child with remaining input tokens
-		n->children[chidx] = syntax_try(chtype, unmatched, chend);
-		if(n->children[chidx] == NULL)
-		{
-			//Failed to match this child.
-			//Free any children that we did match.
-			while(chidx > 0)
-			{
-				chidx--;
-				syntax_free(n->children[chidx]);
-			}
-			
-			//Couldn't match all children.
-			free(n);
-			return NULL;
-		}
-		
-		//Matched this child. Advance past the tokens it used.
-		n->end = n->children[chidx]->end;
-		unmatched = n->end->next;
-		n->ntoks += n->children[chidx]->ntoks;
-	}
-	
-	//Success
-	assert(n->ntoks > 0);
-	return n;	
-}
-
-
 syntax_node_t *syntax_try(syntax_type_t type, tok_t *start, tok_t *end)
 {
-	//Validate type parameter
-	if(type <= 0 || type >= S_MAX)
-	{
-		fprintf(stderr, "bad syntax table");
-		abort();
-	}
+	//Parser stack
+	#define PSTACK_MAX 16
+	syntax_node_t *pstack[PSTACK_MAX] = {NULL};
+	int pstack_next = 0;
 	
-	//If we have no tokens left to match with, we cannot match any syntax.
-	if(end->next == start)
+	//Attempt to consume all of the input
+	tok_t *tt = start;
+	while(1)
 	{
-		return NULL;
-	}
-	
-	//If we're trying to match a token, then this problem is trivial.
-	//See if the input range begins with that token.
-	if((int)type > TOK_NONE && (int)type < TOK_MAX)
-	{
-		if(start->type == (int)type)
+		//If we've consumed all input, see if the parser stack can combine into the syntax we want.
+		if(tt == NULL || tt == end->next)
 		{
-			//Token matches
-			syntax_node_t *ts = alloc_mandatory(sizeof(syntax_node_t));
-			ts->type = start->type;
-			ts->start = start;
-			ts->end = start;
-			ts->ntoks = 1;
+			//Check all options for the final syntax we're building
+			for(int oo = 0; syntax_options[type][oo][0] != 0; oo++)
+			{
+				//Must have the right number of elements on the parser stack
+				int total_elems = 0;
+				for(int ee = 1; syntax_options[type][oo][ee] != 0; ee++)
+				{
+					total_elems = ee;
+				}
+				
+				if(pstack_next != total_elems)
+				{
+					//Wrong number of elements parsed to match this.
+					continue;
+				}
+				
+				//Parser stack must match this definition of the syntax
+				bool children_correct = true;
+				for(int ee = 1; syntax_options[type][oo][ee] != 0; ee++)
+				{
+					if(pstack[ee-1]->type != syntax_options[type][oo][ee])
+					{
+						children_correct = false;
+						break;
+					}						
+				}
+				
+				if(!children_correct)
+				{
+					//Wrong sequence of child elements on stack
+					continue;
+				}
+				
+				//Alright, looks like we can build the syntax we wanted.
+				syntax_node_t *n = alloc_mandatory(sizeof(syntax_node_t));
+				n->type = type;
+				n->option = syntax_options[type][oo][0];
+				n->start = pstack[0]->start;
+				for(int cc = 0; cc < pstack_next; cc++)
+				{
+					n->children[cc] = pstack[cc];
+					n->end = pstack[cc]->end;
+					n->ntoks += pstack[cc]->ntoks;
+				}
+				return n;
+			}
+		}
+		
+		//See if anything on the parser stack can be combined into larger syntax elements...
+		int found_ss = -1; //Resultant syntax that we found
+		int found_oo = -1; //Option of how we'll construct that syntax
+		int found_nelems = -1; //How many elements are used in the found syntax option
+		for(int ss = S_START + 1; ss < S_MAX; ss++)
+		{
+			//Consider combining our existing stack entries to make syntax element ss.
+			//First, look ahead and see if ss is allowed to be followed by the next input token.
+			//(If we combine the existing stack into an element ss, then it ends up followed by remaining input.)
+			if(tt != NULL)
+			{
+				int lookahead = tt->type;
+				if((syntax_follow[ss][lookahead / 8] & (1 << (lookahead % 8))) == 0)
+				{
+					//Syntax element ss is not allowed to be followed by what follows in our input.
+					//So we can't combine and form one right now.
+					continue;
+				}
+			}
 			
-			return ts;
+			assert(syntax_options[ss][0][0] != 0);
+			for(int oo = 0; syntax_options[ss][oo][0] != 0; oo++)
+			{
+				//Figure out how many elements this option contains
+				int nelems = -1;
+				for(int ee = 1; syntax_options[ss][oo][ee] != 0; ee++)
+				{
+					nelems = ee;
+				}
+				assert(nelems >= 1);
+				
+				//If we don't have that many elements in our parser stack, we can't match it
+				if(nelems > pstack_next)
+					continue;
+				
+				//Compare the most recent parser stack elements with the required elements
+				int comp_start = pstack_next - nelems;
+				bool match = true;
+				for(int cc = 0; cc < nelems; cc++)
+				{
+					if(pstack[comp_start + cc]->type != syntax_options[ss][oo][1 + cc])
+					{
+						match = false;
+						break;
+					}
+				}
+				
+				if(match)
+				{
+					//Most recent entries on parser stack can be combined into this new element.
+					//Pick the longest option that applies to the syntax element generated.
+					if(nelems > found_nelems)
+					{
+						found_ss = ss;
+						found_oo = oo;
+						found_nelems = nelems;
+					}
+				}
+			}
 		}
-		else
-		{	
-			//Token doesn't match
-			return NULL;
-		}
-	}
-	
-	//All other syntax should have at least one way to construct it in our syntax table
-	assert(syntax_options[type][0][0] != 0);
-	
-	//Pick the one that matches the longest sequence of tokens.
-	syntax_node_t *longest_option = NULL;
-	for(int option = 0; syntax_options[type][option][0] != 0; option++)
-	{
-		//Try to match the option
-		syntax_node_t *option_result = syntax_try_option(type, option, start, end);
-		if(option_result == NULL)
+
+		if(found_ss != -1)
 		{
-			//Couldn't match this option
+			//Found a larger syntax element we can make from the elements currently on the parser stack.
+			syntax_node_t *n = alloc_mandatory(sizeof(syntax_node_t));
+			n->type = found_ss;
+			n->option = syntax_options[found_ss][found_oo][0];
+			
+			//Pop the elements off the stack and use them in constructing the new item.
+			int lastelem = found_nelems - 1;
+			for(int cc = 0; cc < found_nelems; cc++)
+			{
+				assert(pstack_next > 0);
+				assert(syntax_options[found_ss][found_oo][1 + lastelem - cc] == pstack[pstack_next - 1]->type);
+				
+				n->children[ lastelem - cc ] = pstack[pstack_next - 1];
+				n->ntoks += n->children[ lastelem - cc ]->ntoks;
+				pstack_next--;
+			}
+			n->start = n->children[0]->start;
+			n->end = n->children[lastelem]->end;
+			
+			assert(pstack_next >= 0);
+			assert(pstack_next < PSTACK_MAX);
+			
+			//Put the new item on the stack instead
+			pstack[pstack_next] = n;
+			pstack_next++;
+			
+			//Try again to combine
 			continue;
 		}
-		else if(longest_option == NULL)
-		{
-			//First match
-			longest_option = option_result;
-		}
-		else if(longest_option->ntoks < option_result->ntoks)
-		{
-			//Longer than existing match
-			syntax_free(longest_option);
-			longest_option = option_result;
-		}
-	}
 		
-	return longest_option;
+		//Nothing on the stack can be combined into a larger syntax element.
+		
+		//See if we're out of input.
+		if(tt == NULL || end->next == tt)
+			break;
+		
+		//Consume another input token and put it onto the stack by itself.
+		syntax_node_t *tn = alloc_mandatory(sizeof(syntax_node_t));
+		tn->type = (syntax_type_t)(tt->type);
+		tn->start = tt;
+		tn->end = tt;
+		tn->ntoks = 1;
+		
+		assert(pstack_next < PSTACK_MAX);
+		pstack[pstack_next] = tn;
+		pstack_next++;
+		
+		tt = tt->next;
+	}
+	
+	//Didn't match
+	while(pstack_next > 0)
+	{
+		syntax_free(pstack[pstack_next - 1]);
+		pstack_next--;
+	}
+	return NULL;
 }
-
 
 void syntax_doconst(syntax_node_t *node)
 {	

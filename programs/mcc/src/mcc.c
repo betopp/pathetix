@@ -7,6 +7,7 @@
 #include "dirs.h"
 #include "alloc.h"
 #include "macro.h"
+#include "syntax.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,9 @@ int main(int argc, const char **argv)
 		printf("usage: %s input\n", argv[0]);
 		exit(0);
 	}
+	
+	//Init parsing tables
+	syntax_init();
 	
 	//Set up built-in macros
 	macro_init();
@@ -59,6 +63,20 @@ int main(int argc, const char **argv)
 	
 	//Perform preprocessing passes on the file as a list of tokens
 	prep_pass(fp_tok);
+	
+	//Build syntax tree for the overall file ("translation unit")
+	tok_t *fp_tok_last = fp_tok;
+	while(fp_tok_last->next != NULL)
+	{
+		fp_tok_last = fp_tok_last->next;
+	}
+	syntax_node_t *top = syntax_try(S_TRANSLATION_UNIT, fp_tok, fp_tok_last);
+	if(top == NULL)
+	{
+		fprintf(stderr, "syntax error");
+		return -1;
+	}
+	
 	
 	//Print result for debugging for now
 	for(tok_t *tt = fp_tok; tt != NULL; tt = tt->next)

@@ -10,7 +10,7 @@
 #define SYNTAX_OPTIONS 16
 
 //How many children each syntax node can have
-#define SYNTAX_FANOUT 8
+#define SYNTAX_FANOUT 10
 
 //All possible elements of C99 syntax.
 typedef enum syntax_type_e
@@ -68,6 +68,26 @@ typedef enum syntax_type_e
 	S_STRUCT_DECLARATOR_LIST,
 	S_IDENTIFIER_LIST,
 	S_STRUCT_DECLARATOR,
+	S_TRANSLATION_UNIT,
+	S_EXTERNAL_DECLARATION,
+	S_FUNCTION_DEFINITION,
+	S_DECLARATION,
+	S_DECLARATION_LIST,
+	S_COMPOUND_STATEMENT,
+	S_INIT_DECLARATOR_LIST,
+	S_INIT_DECLARATOR,
+	S_INITIALIZER,
+	S_BLOCK_ITEM_LIST,
+	S_BLOCK_ITEM,
+	S_STATEMENT,
+	S_LABELED_STATEMENT,
+	S_EXPRESSION_STATEMENT,
+	S_SELECTION_STATEMENT,
+	S_ITERATION_STATEMENT,
+	S_JUMP_STATEMENT,
+	S_DESIGNATION,
+	S_DESIGNATOR_LIST,
+	S_DESIGNATOR,
 	
 	S_MAX
 
@@ -103,6 +123,9 @@ typedef struct syntax_node_s
 	void *value;
 	
 } syntax_node_t;
+
+//Initializes tables needed for syntax parsing
+void syntax_init(void);
 
 //Tries to build a syntax element. Returns the element (a tree) on success, or NULL on failure.
 syntax_node_t *syntax_try(syntax_type_t type, tok_t *start, tok_t *end);
