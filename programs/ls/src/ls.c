@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #include <pcmd.h>
@@ -135,19 +136,19 @@ int main(int argc, char **argv)
 {
 	pcmd_parse(&cmd, argc, argv);
 	
-	if(argc <= 1)
+	int handled = 0;
+	for(int aa = 1; aa < argc; aa++)
+	{
+		if(strlen(argv[aa]) > 0)
+		{
+			handle_filename(argv[aa]);
+			handled++;
+		}
+	}
+	
+	if(handled == 0)
 	{
 		handle_filename(".");
-	}
-	else
-	{
-		for(int aa = 1; aa < argc; aa++)
-		{
-			if(argv[aa][0] == '-')
-				continue;
-			
-			handle_filename(argv[aa]);
-		}
 	}
 	
 	if(!cmd_list)
