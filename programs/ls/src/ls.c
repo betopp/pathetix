@@ -21,20 +21,34 @@ static const pcmd_t cmd =
 	.opts = (pcmd_opt_t[])
 	{
 		{
+			.name = "List Mode",
+			.desc = "Outputs one file per line with details.",
 			.letters = "l",
 			.words = (const char *[]){ "list", NULL },
-			.valb = &cmd_list,
+			.given = &cmd_list,
 		},
 		{
+			.name = "All Files",
+			.desc = "Includes hidden files (beginning with \".\") in output.",
 			.letters = "a",
 			.words = (const char *[]){ "all", NULL },
-			.valb = &cmd_all,
+			.given = &cmd_all,
 		},
+		{ 0 }
 	}
 };
 
 void print_info(const char *name, const struct stat *st)
 {	
+	if(!cmd_list)
+	{
+		//Simple printout
+		printf("%s ", name);
+		return;
+	}
+	
+	//Full list format
+	
 	char *typestr = "?";
 	if(S_ISDIR(st->st_mode))
 		typestr = "d";
@@ -117,7 +131,7 @@ void handle_filename(const char *name)
 	closedir(dirp);
 }
 
-int main(int argc, const char **argv)
+int main(int argc, char **argv)
 {
 	pcmd_parse(&cmd, argc, argv);
 	
@@ -134,6 +148,12 @@ int main(int argc, const char **argv)
 			
 			handle_filename(argv[aa]);
 		}
+	}
+	
+	if(!cmd_list)
+	{
+		//Non-list output needs a single newline at the end
+		printf("\n");
 	}
 	
 	return 0;

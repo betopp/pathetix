@@ -35,6 +35,17 @@ int _printf_conv_s(FILE *stream, int flags, int minwidth, int precision, const c
 	return num;
 }
 
+//Implementation of conversion for printf family - characters. Returns number of characters printed.
+int _printf_conv_c(FILE *stream, int flags, int minwidth, int precision, int val)
+{
+	(void)flags;
+	(void)minwidth;
+	(void)precision;
+	
+	fputc(val, stream);
+	return 1;
+}
+
 //Implementation of conversion for printf family - signed integers. Returns number of characters printed.
 int _printf_conv_d(FILE *stream, int flags, int minwidth, int precision, long long int val)
 {
@@ -492,6 +503,8 @@ int vfprintf(FILE *stream, const char *format, va_list ap)
 			
 			//Character, or wide-character as multibyte
 			case 'c':
+				signed_val = va_arg(ap, int);
+				retval += _printf_conv_c(stream, flags, minwidth, precision, signed_val);
 				break;
 			
 			//String

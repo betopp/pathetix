@@ -190,6 +190,14 @@ static void con_outp(int ch)
 		con_curs_col = 0;
 		return;
 	}
+	if(ch == '\t')
+	{
+		for(int ss = 0; ss < 4; ss++)
+		{
+			con_outp(' ');
+		}
+		return;
+	}
 	if(ch == 8)
 	{
 		if(con_curs_col > 0)
