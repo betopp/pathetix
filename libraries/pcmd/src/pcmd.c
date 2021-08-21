@@ -11,8 +11,8 @@
 //Prints help and exits.
 static void pcmd_help(const pcmd_t *cmd)
 {
-	fprintf(stderr, "%s\n", cmd->title);
-	fprintf(stderr, "\t%s\n", cmd->desc);
+	fprintf(stderr, "%s ", cmd->desc);
+	fprintf(stderr, "(%s)\n", cmd->title);
 	fprintf(stderr, "Version:  %s\n", cmd->version);
 	fprintf(stderr, "Built at: %s\n", cmd->date);
 	fprintf(stderr, "Built by: %s\n", cmd->user);
@@ -20,19 +20,19 @@ static void pcmd_help(const pcmd_t *cmd)
 	for(int oo = 0; cmd->opts[oo].letters != NULL; oo++)
 	{
 		const pcmd_opt_t *opt = &(cmd->opts[oo]);
-		fprintf(stderr, "\t%s\n", opt->name);
+		fprintf(stderr, "\t%s ( ", opt->name);
 		if(opt->words != NULL)
 		{
 			for(int ww = 0; opt->words[ww] != NULL; ww++)
 			{
-				fprintf(stderr, "\t\t--%s\n", opt->words[ww]);
+				fprintf(stderr, "--%s ", opt->words[ww]);
 			}
 		}
 		for(int ll = 0; opt->letters[ll] != '\0'; ll++)
 		{
-			fprintf(stderr, "\t\t-%c\n", opt->letters[ll]);
+			fprintf(stderr, "-%c ", opt->letters[ll]);
 		}
-		fprintf(stderr, "\t\t%s\n", opt->desc);
+		fprintf(stderr, ")\n\t\t%s\n", opt->desc);
 	}
 }
 
@@ -65,7 +65,6 @@ static const pcmd_opt_t *pcmd_find_word(const pcmd_t *cmd, const char *name)
 }
 
 //Finds an option given a letter (short) name.
-/*
 static const pcmd_opt_t *pcmd_find_letter(const pcmd_t *cmd, char letter)
 {
 	//Search all defined options, terminated by one with a NULL letters string.
@@ -84,7 +83,6 @@ static const pcmd_opt_t *pcmd_find_letter(const pcmd_t *cmd, char letter)
 	//Not found
 	return NULL;
 }
-*/
 
 void pcmd_parse(const pcmd_t *cmd, int argc, char **argv)
 {
@@ -194,10 +192,30 @@ void pcmd_parse(const pcmd_t *cmd, int argc, char **argv)
 			argv[aa][0] = '\0';
 			continue;
 		}
-		
-		//Not a long option. Parse short options.
-		fprintf(stderr, "Short options unsupported for now.\n");
-		exit(-1);
+		else
+		{
+			//Not a long option. Parse short options, which may be stacked together in one argument.
+			//Todo - how do we decide when a short option has a value associated with it?
+			for(int ll = 1; argv[aa][ll] != '\0'; ll++)
+			{
+				const pcmd_opt_t *opt = pcmd_find_letter(cmd, argv[aa][ll]);
+				if(opt == NULL)
+				{
+					//Didn't find this option.
+					fprintf(stderr, "%s: unknown option \"%c\".\n", argv[0], argv[aa][ll]);
+					exit(-1);
+				}
+				
+				if(opt->given != NULL)
+				{
+					*(opt->given) = true;
+				}
+			}
+			
+			//Consumed the argument. Stick a NUL at the beginning to turn it into an empty-string.
+			argv[aa][0] = '\0';
+			continue;
+		}
 	}
 	
 	return;
